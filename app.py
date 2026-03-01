@@ -32,7 +32,11 @@ st.markdown("""
 }
 .stApp { background: #f0f4f8; }
 .block-container { padding: 1.5rem 2rem 5rem !important; max-width: 1120px; }
-#MainMenu, footer, header { visibility: hidden; }
+
+/* Menünün kaybolmasını engellemek için header'ı tamamen gizlemek yerine şeffaf yapıyoruz */
+#MainMenu, footer { visibility: hidden; }
+header { background: transparent !important; }
+header [data-testid="stToolbar"] { display: none !important; }
 
 /* ── Sidebar ── */
 [data-testid="stSidebar"] {
@@ -41,18 +45,14 @@ st.markdown("""
 }
 [data-testid="stSidebar"] > div { padding: 1.5rem 1rem; }
 
-/* Sidebar collapse/expand button - floating green circle */
+/* Sidebar AÇIKKEN içindeki kapatma butonu */
 [data-testid="stSidebarCollapseButton"] {
     background-color: #059669 !important;
     border-radius: 50% !important;
-    width: 40px !important;
-    height: 40px !important;
+    width: 35px !important;
+    height: 35px !important;
     border: none !important;
     box-shadow: 0 4px 12px rgba(5,150,105,0.4) !important;
-    position: fixed !important;
-    top: 15px !important;
-    left: 15px !important;
-    z-index: 999999 !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -62,12 +62,13 @@ st.markdown("""
     color: white !important;
 }
 
-/* Sayfa kapalıyken hamburger ikonunun stili */
-[data-testid="collapsedControl"] {
+/* Sidebar KAPALIYKEN ekranda beliren açma butonu (Mobil ve Masaüstü Fix) */
+[data-testid="collapsedControl"], 
+[data-testid="stSidebarCollapsedControl"] {
     background-color: #059669 !important;
     border-radius: 50% !important;
-    width: 40px !important;
-    height: 40px !important;
+    width: 45px !important;
+    height: 45px !important;
     box-shadow: 0 4px 12px rgba(5,150,105,0.4) !important;
     position: fixed !important;
     top: 15px !important;
@@ -76,9 +77,12 @@ st.markdown("""
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+    visibility: visible !important;
 }
-[data-testid="collapsedControl"] svg {
+[data-testid="collapsedControl"] svg, 
+[data-testid="stSidebarCollapsedControl"] svg {
     fill: white !important;
+    color: white !important;
 }
 
 .logo-wrap { margin-bottom: 1.6rem; }
