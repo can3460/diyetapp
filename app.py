@@ -9,35 +9,71 @@ from datetime import datetime
 SHEET_ID  = "1KhfoB6QShha7wW64oSjLsUna5BgBjFoo6-wWkl_-ny8"
 GID_DIYET = "0"
 GID_ALISV = "1768296250"
-GID_USERS = "1046924894" # Yeni Users sayfası GID'si
+GID_USERS = "1046924894"
 
+# Secrets eşleşmesi (EMAIL_SENDER ve EMAIL_PASSWORD olarak)
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 465
 SMTP_USER = st.secrets.get("EMAIL_SENDER", "")
 SMTP_PASS = st.secrets.get("EMAIL_PASSWORD", "")
 
-st.set_page_config(page_title="Can & Berrin · Beslenme", page_icon="🥗", layout="wide")
+st.set_page_config(
+    page_title="Can & Berrin · Beslenme",
+    page_icon="🥗",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-# ─── CSS ──────────────────────────────────────────────────────────────────────
+# ─── GLOBAL CSS (Orijinal UX Geri Geldi) ───────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&family=Inter:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap');
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-.stApp { background: #f5f7fa; }
-.sidebar-logo { font-family: 'Nunito', sans-serif; font-size: 1.3rem; font-weight: 800; color: #2d6a4f; margin-bottom: 1rem; }
-.user-card { background: white; padding: 12px; border-radius: 12px; border: 1px solid #e8eaf0; margin-bottom: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.03); }
-.meal-card { background: white; border-left: 5px solid #2d6a4f; padding: 15px; border-radius: 12px; margin-bottom: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+.stApp { background: #f5f7fa; color: #1a1d27; }
+.block-container { padding: 1.5rem 2rem 4rem; max-width: 1100px; }
+#MainMenu, footer, header { visibility: hidden; }
+[data-testid="stSidebar"] { background: #ffffff; border-right: 1px solid #e8eaf0; }
+.sidebar-logo { font-family: 'Nunito', sans-serif; font-size: 1.3rem; font-weight: 800; color: #2d6a4f; margin-bottom: 0.2rem; }
+.sidebar-sub { font-size: 0.8rem; color: #9ca3af; margin-bottom: 1.5rem; }
+.sidebar-section { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #9ca3af; margin: 1.2rem 0 0.5rem; }
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.8rem; padding-bottom: 1rem; border-bottom: 2px solid #e8eaf0; }
+.page-title { font-family: 'Nunito', sans-serif; font-size: 1.7rem; font-weight: 800; color: #1a1d27; }
+.page-title span { color: #2d6a4f; }
+.today-chip { background: #d1fae5; color: #065f46; font-size: 0.85rem; font-weight: 700; padding: 0.35rem 1rem; border-radius: 50px; font-family: 'Nunito', sans-serif; }
+.person-header { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem; padding: 0.8rem 1rem; border-radius: 12px; }
+.ph-can { background: #eff6ff; } .ph-berrin { background: #fdf2f8; }
+.avatar { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1rem; color: #fff; }
+.av-can { background: linear-gradient(135deg,#3b82f6,#6366f1); } .av-berrin { background: linear-gradient(135deg,#ec4899,#f472b6); }
+.person-name { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1.1rem; }
+.pn-can { color: #1d4ed8; } .pn-berrin { color: #be185d; }
+.meal-card { background: #ffffff; border: 1px solid #e8eaf0; border-radius: 12px; padding: 0.9rem 1.1rem; margin-bottom: 0.7rem; box-shadow: 0 1px 4px rgba(0,0,0,0.05); position: relative; overflow: hidden; }
+.meal-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; border-radius: 4px 0 0 4px; }
+.mc-can::before { background: linear-gradient(to bottom,#3b82f6,#6366f1); } .mc-berrin::before { background: linear-gradient(to bottom,#ec4899,#f472b6); }
+.meal-tag { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 0.25rem; }
+.mt-can { color: #3b82f6; } .mt-berrin { color: #ec4899; }
+.meal-text { font-size: 0.93rem; line-height: 1.6; color: #374151; }
+.meal-icon-bg { position: absolute; right: 0.9rem; top: 50%; transform: translateY(-50%); font-size: 1.7rem; opacity: 0.12; }
+.user-row { display: flex; justify-content: space-between; background: white; padding: 10px 15px; border-radius: 10px; border: 1px solid #e8eaf0; margin-bottom: 8px; }
 </style>
 """, unsafe_allow_html=True)
 
 # ─── DATA LOADING ─────────────────────────────────────────────────────────────
-@st.cache_data(ttl=30) # 30 saniyede bir veriyi yeniler
-def load_sheet_data(gid, cols=None):
+@st.cache_data(ttl=60)
+def load_data(gid, cols=None):
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={gid}"
     df = pd.read_csv(url)
-    if cols:
-        df.columns = cols[:len(df.columns)]
+    if cols: df.columns = cols[:len(df.columns)]
     return df
+
+# ─── HELPERS ──────────────────────────────────────────────────────────────────
+GUNLER     = ["Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi","Pazar"]
+GUN_EMOJIS = ["🌿","🔥","💧","⚡","🌸","☀️","🌙"]
+OGÜN_ICONS = {"kahvaltı":"☀️","öğle":"🌤️","akşam":"🌙","ara":"🍎","atıştırma":"🍎","gece":"🌙"}
+
+def meal_icon(ogün):
+    for k,v in OGÜN_ICONS.items():
+        if k in str(ogün).lower(): return v
+    return "🍽️"
 
 def send_mail(recipients, subject, html_body):
     msg = MIMEMultipart("alternative")
@@ -47,83 +83,81 @@ def send_mail(recipients, subject, html_body):
         srv.login(SMTP_USER, SMTP_PASS)
         srv.sendmail(SMTP_USER, recipients, msg.as_string())
 
+# ─── SESSION STATE ────────────────────────────────────────────────────────────
+if "secili_gun" not in st.session_state:
+    st.session_state.secili_gun = GUNLER[datetime.now().weekday()]
+
 # ─── SIDEBAR ──────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown('<div class="sidebar-logo">🥗 Beslenme Paneli</div>', unsafe_allow_html=True)
-    page = st.radio("Menü", ["🥦 Günlük Program", "🛒 Alışveriş Listesi", "👥 Kullanıcı Yönetimi"])
+    st.markdown('<div class="sidebar-sub">Can & Berrin · Özel Takip</div>', unsafe_allow_html=True)
     
-    st.divider()
-    
-    # Mail Gönderim Mantığı
-    if st.button("📧 Menüyü Maile Gönder", type="primary", use_container_width=True):
-        try:
-            # Kullanıcıları çek
-            users_df = load_sheet_data(GID_USERS, ["name", "email"])
-            emails = users_df["email"].dropna().tolist()
-            
-            if not emails:
-                st.error("Sheet'te kayıtlı e-posta bulunamadı!")
+    st.markdown('<div class="sidebar-section">Menü</div>', unsafe_allow_html=True)
+    page = st.radio("", ["🥦 Günlük Beslenme", "🛒 Alışveriş Listesi", "👥 Kullanıcılar"], label_visibility="collapsed")
+
+    if "Beslenme" in page:
+        st.markdown('<div class="sidebar-section">Gün Seç</div>', unsafe_allow_html=True)
+        bugun_sidebar = GUNLER[datetime.now().weekday()]
+        for i, gun in enumerate(GUNLER):
+            label = f"{GUN_EMOJIS[i]} {gun}{'  📍' if gun == bugun_sidebar else ''}"
+            btn_type = "primary" if gun == st.session_state.secili_gun else "secondary"
+            if st.button(label, key=f"nav_{gun}", type=btn_type, use_container_width=True):
+                st.session_state.secili_gun = gun
+                st.rerun()
+
+    st.markdown('<div class="sidebar-section">Durum</div>', unsafe_allow_html=True)
+    if SMTP_USER: st.success(f"📧 SMTP Aktif: {SMTP_USER}")
+    else: st.error("📧 SMTP Secrets Eksik!")
+
+# ─── MAIN CONTENT ─────────────────────────────────────────────────────────────
+try:
+    df_diyet = load_data(GID_DIYET, ["Gün","Öğün","Can","Berrin","Notlar"])
+    df_alisv = load_data(GID_ALISV, ["Kategori","Ürün","Miktar","Durum"])
+    df_users = load_data(GID_USERS, ["name", "email"])
+
+    # ── Sağ Üst Mail Butonu ──
+    _, btn_col = st.columns([8, 2])
+    with btn_col:
+        if st.button("📧 Mail Gönder", type="primary", use_container_width=True):
+            emails = df_users["email"].dropna().tolist()
+            if not emails: st.warning("Alıcı listesi boş!")
             else:
-                with st.spinner("Mailler hazırlanıyor..."):
-                    # O günün verisini çek
-                    diyet_df = load_sheet_data(GID_DIYET, ["Gün","Öğün","Can","Berrin","Notlar"])
-                    bugun = ["Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi","Pazar"][datetime.now().weekday()]
-                    
-                    html = f"<h3>{bugun} Beslenme Programı Hazır!</h3><p>Detayları görmek için uygulamaya giriş yapın.</p>"
-                    send_email_res = send_mail(emails, f"🥗 {bugun} Beslenme Planı", html)
-                    st.success(f"Mailler {len(emails)} kişiye gönderildi! 🚀")
-        except Exception as e:
-            st.error(f"Mail gönderilemedi: {e}")
+                with st.spinner("📨 Gönderiliyor..."):
+                    try:
+                        # Basit Mail Body (Geliştirilebilir)
+                        html = f"<h2>{st.session_state.secili_gun} Menüsü Hazır!</h2><p>Lütfen uygulamadan detayları kontrol edin.</p>"
+                        send_mail(emails, f"🥗 {st.session_state.secili_gun} Beslenme Planı", html)
+                        st.success("✅ Mailler uçtu!")
+                    except Exception as e: st.error(f"Hata: {e}")
 
-# ─── ANA SAYFA ────────────────────────────────────────────────────────────────
+    if "Beslenme" in page:
+        secili = st.session_state.secili_gun
+        bugun  = GUNLER[datetime.now().weekday()]
+        plan   = df_diyet[df_diyet["Gün"].str.contains(secili, case=False, na=False)]
 
-if page == "👥 Kullanıcı Yönetimi":
-    st.title("👥 Kullanıcı Yönetimi")
-    st.markdown("Veriler doğrudan **Google Sheets** üzerinden okunmaktadır.")
-    
-    try:
-        users_df = load_sheet_data(GID_USERS, ["name", "email"])
-        st.subheader("Kayıtlı Alıcılar")
-        for i, row in users_df.iterrows():
-            st.markdown(f"""
-            <div class="user-card">
-                <span>👤 <b>{row['name']}</b></span>
-                <code style="color:#2d6a4f">{row['email']}</code>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        st.info("💡 **Yeni Kullanıcı Ekleme/Silme:** Listeyi güncellemek için [buraya tıklayarak Google Sheets'i açın](https://docs.google.com/spreadsheets/d/1KhfoB6QShha7wW64oSjLsUna5BgBjFoo6-wWkl_-ny8/edit#gid=1046924894) ve 'Users' sayfasında değişiklik yapın. Değişiklikler 30 saniye içinde buraya yansıyacaktır.")
-    except:
-        st.error("Kullanıcı listesi okunamadı. Sheet ID veya GID hatalı olabilir.")
+        st.markdown(f'<div class="page-header"><div class="page-title">📅 <span>{secili}</span> Planı</div>{"<div class=\'today-chip\'>✅ Bugün</div>" if secili == bugun else ""}</div>', unsafe_allow_html=True)
 
-elif page == "🥦 Günlük Program":
-    st.title("🥦 Beslenme Takvimi")
-    gunler = ["Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi","Pazar"]
-    secili_gun = st.selectbox("Gün Seçin", gunler, index=datetime.now().weekday())
-    
-    try:
-        df = load_sheet_data(GID_DIYET, ["Gün","Öğün","Can","Berrin","Notlar"])
-        plan = df[df['Gün'].str.contains(secili_gun, case=False, na=False)]
-        
-        if plan.empty:
-            st.warning(f"{secili_gun} günü için henüz veri girilmemiş.")
+        if plan.empty: st.warning("Seçili gün için veri bulunamadı.")
         else:
-            c1, c2 = st.columns(2)
+            c1, c2 = st.columns(2, gap="large")
             with c1:
-                st.markdown("### 🏃 Can")
-                for _, r in plan.iterrows():
-                    st.markdown(f'<div class="meal-card"><b>{r["Öğün"]}</b><br>{r["Can"]}</div>', unsafe_allow_html=True)
+                st.markdown('<div class="person-header ph-can"><div class="avatar av-can">C</div><div class="person-name pn-can">Can</div></div>', unsafe_allow_html=True)
+                for _, row in plan.iterrows():
+                    st.markdown(f'<div class="meal-card mc-can"><div class="meal-tag mt-can">{row["Öğün"]}</div><div class="meal-text">{row["Can"]}</div><div class="meal-icon-bg">{meal_icon(row["Öğün"])}</div></div>', unsafe_allow_html=True)
             with c2:
-                st.markdown("### 💃 Berrin")
-                for _, r in plan.iterrows():
-                    st.markdown(f'<div class="meal-card"><b>{r["Öğün"]}</b><br>{r["Berrin"]}</div>', unsafe_allow_html=True)
-    except Exception as e:
-        st.error(f"Veri çekme hatası: {e}")
+                st.markdown('<div class="person-header ph-berrin"><div class="avatar av-berrin">B</div><div class="person-name pn-berrin">Berrin</div></div>', unsafe_allow_html=True)
+                for _, row in plan.iterrows():
+                    st.markdown(f'<div class="meal-card mc-berrin"><div class="meal-tag mt-berrin">{row["Öğün"]}</div><div class="meal-text">{row["Berrin"]}</div><div class="meal-icon-bg">{meal_icon(row["Öğün"])}</div></div>', unsafe_allow_html=True)
 
-elif page == "🛒 Alışveriş Listesi":
-    st.title("🛒 Market Listesi")
-    try:
-        df_a = load_sheet_data(GID_ALISV, ["Kategori","Ürün","Miktar","Durum"])
-        st.dataframe(df_a, use_container_width=True, hide_index=True)
-    except:
-        st.error("Alışveriş listesi yüklenemedi.")
+    elif "Alışveriş" in page:
+        st.markdown('<div class="page-header"><div class="page-title">🛒 <span>Alışveriş</span> Listesi</div></div>', unsafe_allow_html=True)
+        st.dataframe(df_alisv, use_container_width=True, hide_index=True)
+
+    elif "Kullanıcılar" in page:
+        st.markdown('<div class="page-header"><div class="page-title">👥 Kayıtlı <span>Alıcılar</span></div></div>', unsafe_allow_html=True)
+        for _, u in df_users.iterrows():
+            st.markdown(f'<div class="user-row"><span><b>{u["name"]}</b></span> <code>{u["email"]}</code></div>', unsafe_allow_html=True)
+        st.info("💡 Ekleme/Çıkarma işlemini Google Sheets 'Users' sekmesinden yapabilirsiniz.")
+
+except Exception as e:
+    st.error(f"⚠️ Kritik Hata: {e}")
