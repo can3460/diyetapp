@@ -34,28 +34,27 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 /* Kart Tasarımları */
 .meal-card {
     background: white; border-radius: 12px; padding: 1.2rem;
-    margin-bottom: 12px; border: 1px solid #f1f5f9;
+    margin-bottom: 15px; border: 1px solid #f1f5f9;
     box-shadow: 0 2px 4px rgba(0,0,0,0.02);
 }
 
 /* Supplement: Mavi ve Belirgin */
 .supp-pill {
-    background: #e0f2fe; color: #0369a1;
+    background-color: #e0f2fe; color: #0369a1;
     padding: 6px 12px; border-radius: 8px; margin-top: 10px;
     font-size: 0.85rem; font-weight: 700; border: 1px solid #bae6fd;
-    display: inline-block; width: 100%;
+    display: block;
 }
 
 /* Notlar: Sarı ve İtalik */
 .note-pill {
-    background: #fef3c7; color: #92400e;
+    background-color: #fef3c7; color: #92400e;
     padding: 6px 12px; border-radius: 8px; margin-top: 8px;
     font-size: 0.8rem; font-style: italic; border: 1px solid #fde68a;
-    display: inline-block; width: 100%;
+    display: block;
 }
 
-/* Kişi Başlıkları */
-.person-title { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 15px; }
+.person-title { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1.3rem; margin-bottom: 15px; }
 
 @media (max-width: 768px) {
     .main .block-container { padding-top: 4.5rem !important; }
@@ -64,7 +63,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 """, unsafe_allow_html=True)
 
 # ─── DATA LOADING ─────────────────────────────────────────────────────────────
-@st.cache_data(ttl=15)
+@st.cache_data(ttl=10) # 10 saniyede bir yenile
 def load_data():
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={GID_DIYET}"
     df = pd.read_csv(url)
@@ -92,55 +91,57 @@ try:
 
     # Bilgi Hapları
     st.markdown("""
-    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;">
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 25px;">
         <div style="background:white; border-radius:10px; padding:8px 15px; border-left:4px solid #3b82f6; font-size:0.8rem;">💧 <b>Su:</b> 3 Litre</div>
         <div style="background:white; border-radius:10px; padding:8px 15px; border-left:4px solid #fbbf24; font-size:0.8rem;">🥑 <b>Yağ:</b> 1 YK = 10g</div>
         <div style="background:white; border-radius:10px; padding:8px 15px; border-left:4px solid #10b981; font-size:0.8rem;">🌿 <b>Yeşillik:</b> Maydanoz/Roka/Tere serbest.</div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Veri Filtreleme
     plan = df[df["Gün"].astype(str).str.contains(secili, case=False, na=False)]
 
     if plan.empty:
         st.info("Bu gün için veri bulunamadı.")
     else:
-        # Dinamik Sütun Eşleme (Hata payı bırakmaz)
+        # Sütun isimlerini güvenli bir şekilde bulalım
         c_can = [c for c in df.columns if 'Can' in c][0]
         c_berrin = [c for c in df.columns if 'Berrin' in c][0]
-        c_supp = [c for c in df.columns if 'Supplement' in c][0]
-        c_not = [c for c in df.columns if 'Notlar' in c][0]
+        c_supp = [c for c in df.columns if 'Supplement' in c or 'Takviye' in c][0]
+        c_not = [c for c in df.columns if 'Not' in c][0]
 
         col_left, col_right = st.columns(2, gap="medium")
 
-        def draw_person_column(data, person_col, label, color):
+        # Görsel yardımcılar
+        
+
+        def draw_meals(data, person_col, label, color):
             st.markdown(f'<div class="person-title" style="color:{color};">{label}</div>', unsafe_allow_html=True)
             for _, r in data.iterrows():
-                # İçerikleri güvenli string'e çevir
-                meal = str(r[person_col]).strip()
-                supp = str(r[c_supp]).strip()
-                note = str(r[c_not]).strip()
-                ogun = str(r['Öğün']).strip()
+                # Veri temizleme
+                meal_val = str(r[person_col]).strip()
+                supp_val = str(r[c_supp]).strip()
+                note_val = str(r[c_not]).strip()
+                ogun_val = str(r['Öğün']).strip()
 
-                # HTML İnşası (Hata payını azaltmak için parçalı yapı)
-                card_html = f'<div class="meal-card">'
-                card_html += f'<div style="font-size:0.75rem; color:#94a3b8; font-weight:800; text-transform:uppercase;">{ogun}</div>'
-                card_html += f'<div style="margin-top:5px; color:#1a1d27; font-weight:500;">{meal}</div>'
+                # HTML Yapısı (Tırnak hatalarını önlemek için temiz string birleştirme)
+                pill_supp = f'<div class="supp-pill">💊 {supp_val}</div>' if supp_val and supp_val not in ["nan", "-", ""] else ""
+                pill_note = f'<div class="note-pill">📝 {note_val}</div>' if note_val and note_val not in ["nan", "-", ""] else ""
+
+                card_template = f"""
+                <div class="meal-card">
+                    <div style="font-size:0.75rem; color:#94a3b8; font-weight:800; text-transform:uppercase;">{ogun_val}</div>
+                    <div style="margin-top:5px; color:#1a1d27; font-weight:600; font-size:1rem;">{meal_text}</div>
+                    {pill_supp}
+                    {pill_note}
+                </div>
+                """.replace("{meal_text}", meal_val) # f-string tırnak karışıklığını önlemek için replace kullandım
                 
-                if supp and supp != "nan" and supp != "-" and supp != "":
-                    card_html += f'<div class="supp-pill">💊 {supp}</div>'
-                
-                if note and note != "nan" and note != "-" and note != "":
-                    card_html += f'<div class="note-pill">📝 {note}</div>'
-                
-                card_html += '</div>'
-                
-                st.markdown(card_html, unsafe_allow_html=True)
+                st.markdown(card_template, unsafe_allow_html=True)
 
         with col_left:
-            draw_person_column(plan, c_can, "🏃 Can", "#1d4ed8")
+            draw_meals(plan, c_can, "🏃 Can", "#1d4ed8")
         with col_right:
-            draw_person_column(plan, c_berrin, "💃 Berrin", "#be185d")
+            draw_meals(plan, c_berrin, "💃 Berrin", "#be185d")
 
 except Exception as e:
     st.error(f"⚠️ Bir hata oluştu: {e}")
