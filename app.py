@@ -63,7 +63,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 """, unsafe_allow_html=True)
 
 # ─── DATA LOADING ─────────────────────────────────────────────────────────────
-@st.cache_data(ttl=10) # 10 saniyede bir yenile
+@st.cache_data(ttl=10)
 def load_data():
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={GID_DIYET}"
     df = pd.read_csv(url)
@@ -103,7 +103,7 @@ try:
     if plan.empty:
         st.info("Bu gün için veri bulunamadı.")
     else:
-        # Sütun isimlerini güvenli bir şekilde bulalım
+        # Sütunları güvenli şekilde yakala
         c_can = [c for c in df.columns if 'Can' in c][0]
         c_berrin = [c for c in df.columns if 'Berrin' in c][0]
         c_supp = [c for c in df.columns if 'Supplement' in c or 'Takviye' in c][0]
@@ -111,32 +111,29 @@ try:
 
         col_left, col_right = st.columns(2, gap="medium")
 
-        # Görsel yardımcılar
-        
-
         def draw_meals(data, person_col, label, color):
             st.markdown(f'<div class="person-title" style="color:{color};">{label}</div>', unsafe_allow_html=True)
             for _, r in data.iterrows():
-                # Veri temizleme
-                meal_val = str(r[person_col]).strip()
-                supp_val = str(r[c_supp]).strip()
-                note_val = str(r[c_not]).strip()
-                ogun_val = str(r['Öğün']).strip()
+                # Verileri metne zorla ve temizle
+                m_val = str(r[person_col]).strip()
+                s_val = str(r[c_supp]).strip()
+                n_val = str(r[c_not]).strip()
+                o_val = str(r['Öğün']).strip()
 
-                # HTML Yapısı (Tırnak hatalarını önlemek için temiz string birleştirme)
-                pill_supp = f'<div class="supp-pill">💊 {supp_val}</div>' if supp_val and supp_val not in ["nan", "-", ""] else ""
-                pill_note = f'<div class="note-pill">📝 {note_val}</div>' if note_val and note_val not in ["nan", "-", ""] else ""
+                # Pill (Hap) içerikleri
+                p_supp = f'<div class="supp-pill">💊 {s_val}</div>' if s_val and s_val not in ["nan", "-", ""] else ""
+                p_note = f'<div class="note-pill">📝 {n_val}</div>' if n_val and n_val not in ["nan", "-", ""] else ""
 
-                card_template = f"""
+                # Kart HTML (Hatasız f-string yapısı)
+                card_html = f"""
                 <div class="meal-card">
-                    <div style="font-size:0.75rem; color:#94a3b8; font-weight:800; text-transform:uppercase;">{ogun_val}</div>
-                    <div style="margin-top:5px; color:#1a1d27; font-weight:600; font-size:1rem;">{meal_text}</div>
-                    {pill_supp}
-                    {pill_note}
+                    <div style="font-size:0.75rem; color:#94a3b8; font-weight:800; text-transform:uppercase;">{o_val}</div>
+                    <div style="margin-top:5px; color:#1a1d27; font-weight:600; font-size:1rem;">{m_val}</div>
+                    {p_supp}
+                    {p_note}
                 </div>
-                """.replace("{meal_text}", meal_val) # f-string tırnak karışıklığını önlemek için replace kullandım
-                
-                st.markdown(card_template, unsafe_allow_html=True)
+                """
+                st.markdown(card_html, unsafe_allow_html=True)
 
         with col_left:
             draw_meals(plan, c_can, "🏃 Can", "#1d4ed8")
