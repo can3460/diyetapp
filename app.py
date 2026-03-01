@@ -1,415 +1,452 @@
 import streamlit as st
 import pandas as pd
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 
-# --- CONFIG ---
-SHEET_ID = "1KhfoB6QShha7wW64oSjLsUna5BgBjFoo6-wWkl_-ny8"
+# ─── CONFIG ───────────────────────────────────────────────────────────────────
+SHEET_ID  = "1KhfoB6QShha7wW64oSjLsUna5BgBjFoo6-wWkl_-ny8"
+GID_DIYET = "0"
+GID_ALISV = "1768296250"
+
+# SMTP — Streamlit Secrets'tan okunur
+SMTP_HOST = "smtp.gmail.com"
+SMTP_PORT = 465
+SMTP_USER = st.secrets.get("SMTP_USER", "")
+SMTP_PASS = st.secrets.get("SMTP_PASS", "")
 
 st.set_page_config(
-    page_title="Can & Berrin Diyet",
+    page_title="Can & Berrin · Beslenme",
     page_icon="🥗",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded",
 )
 
-# ─── CUSTOM CSS ────────────────────────────────────────────────────────────────
+# ─── GLOBAL CSS ───────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap');
 
-/* Reset & Base */
-html, body, [class*="css"] {
-    font-family: 'DM Sans', sans-serif;
-}
-.stApp {
-    background: #0d0f14;
-    color: #e8e8e0;
-}
-.block-container {
-    padding: 2rem 2.5rem 4rem;
-    max-width: 1100px;
-}
-
-/* Hide Streamlit branding */
+html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+.stApp { background: #f5f7fa; color: #1a1d27; }
+.block-container { padding: 1.5rem 2rem 4rem; max-width: 1100px; }
 #MainMenu, footer, header { visibility: hidden; }
 
-/* ── Hero Header ── */
-.hero {
-    background: linear-gradient(135deg, #1a1f2e 0%, #131820 100%);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 20px;
-    padding: 2rem 2.5rem;
-    margin-bottom: 2.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: relative;
-    overflow: hidden;
-}
-.hero::before {
-    content: '';
-    position: absolute;
-    top: -60px; right: -60px;
-    width: 200px; height: 200px;
-    background: radial-gradient(circle, rgba(99,179,131,0.15) 0%, transparent 70%);
-    pointer-events: none;
-}
-.hero::after {
-    content: '';
-    position: absolute;
-    bottom: -60px; left: 30%;
-    width: 180px; height: 180px;
-    background: radial-gradient(circle, rgba(99,130,211,0.12) 0%, transparent 70%);
-    pointer-events: none;
-}
-.hero-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 2.4rem;
-    font-weight: 800;
-    color: #fff;
-    line-height: 1.1;
-    margin: 0;
-}
-.hero-title span { color: #63b383; }
-.hero-sub {
-    color: #8a8d9a;
-    font-size: 0.95rem;
-    margin-top: 0.4rem;
-    font-weight: 300;
-}
-.day-badge {
-    background: linear-gradient(135deg, #63b383, #4a9e6a);
-    color: #fff;
-    font-family: 'Syne', sans-serif;
-    font-weight: 700;
-    font-size: 1.1rem;
-    padding: 0.6rem 1.4rem;
-    border-radius: 50px;
-    white-space: nowrap;
-    box-shadow: 0 4px 20px rgba(99,179,131,0.3);
+[data-testid="stSidebar"] {
+    background: #ffffff;
+    border-right: 1px solid #e8eaf0;
 }
 
-/* ── Day Nav ── */
-.day-nav {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 2rem;
-    flex-wrap: wrap;
+.sidebar-logo {
+    font-family: 'Nunito', sans-serif;
+    font-size: 1.3rem; font-weight: 800; color: #2d6a4f;
+    margin-bottom: 0.2rem;
 }
-.day-pill {
-    background: #1a1f2e;
-    border: 1px solid rgba(255,255,255,0.08);
-    color: #8a8d9a;
-    padding: 0.4rem 1rem;
-    border-radius: 50px;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-family: 'DM Sans', sans-serif;
-}
-.day-pill.active {
-    background: #63b383;
-    color: #fff;
-    border-color: #63b383;
-    font-weight: 600;
+.sidebar-sub { font-size: 0.8rem; color: #9ca3af; margin-bottom: 1.5rem; }
+.sidebar-section {
+    font-size: 0.7rem; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: #9ca3af; margin: 1.2rem 0 0.5rem;
 }
 
-/* ── Section Headers ── */
+.page-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1.8rem; padding-bottom: 1rem;
+    border-bottom: 2px solid #e8eaf0;
+}
+.page-title {
+    font-family: 'Nunito', sans-serif;
+    font-size: 1.7rem; font-weight: 800; color: #1a1d27;
+}
+.page-title span { color: #2d6a4f; }
+.today-chip {
+    background: #d1fae5; color: #065f46;
+    font-size: 0.85rem; font-weight: 700;
+    padding: 0.35rem 1rem; border-radius: 50px;
+    font-family: 'Nunito', sans-serif;
+}
+
 .person-header {
-    display: flex;
-    align-items: center;
-    gap: 0.7rem;
-    margin-bottom: 1.2rem;
-    padding-bottom: 0.8rem;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    display: flex; align-items: center; gap: 0.6rem;
+    margin-bottom: 1rem; padding: 0.8rem 1rem; border-radius: 12px;
 }
-.person-avatar {
-    width: 42px; height: 42px;
-    border-radius: 50%;
+.ph-can    { background: #eff6ff; }
+.ph-berrin { background: #fdf2f8; }
+.avatar {
+    width: 38px; height: 38px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    font-size: 1.2rem;
-    font-weight: 700;
-    font-family: 'Syne', sans-serif;
+    font-family: 'Nunito', sans-serif; font-weight: 800;
+    font-size: 1rem; color: #fff;
 }
-.avatar-can {
-    background: linear-gradient(135deg, #4a6fdc, #6382d3);
-    color: #fff;
-}
-.avatar-berrin {
-    background: linear-gradient(135deg, #c06fa0, #d47bb5);
-    color: #fff;
-}
-.person-name {
-    font-family: 'Syne', sans-serif;
-    font-size: 1.2rem;
-    font-weight: 700;
-    color: #e8e8e0;
-}
+.av-can    { background: linear-gradient(135deg,#3b82f6,#6366f1); }
+.av-berrin { background: linear-gradient(135deg,#ec4899,#f472b6); }
+.person-name { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1.1rem; }
+.pn-can    { color: #1d4ed8; }
+.pn-berrin { color: #be185d; }
 
-/* ── Meal Cards ── */
 .meal-card {
-    background: #1a1f2e;
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 14px;
-    padding: 1rem 1.2rem;
-    margin-bottom: 0.8rem;
-    transition: border-color 0.2s, transform 0.2s;
-    position: relative;
-    overflow: hidden;
+    background: #ffffff; border: 1px solid #e8eaf0; border-radius: 12px;
+    padding: 0.9rem 1.1rem; margin-bottom: 0.7rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    position: relative; overflow: hidden; transition: box-shadow 0.2s;
 }
-.meal-card:hover {
-    border-color: rgba(255,255,255,0.15);
-    transform: translateY(-1px);
-}
+.meal-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.09); }
 .meal-card::before {
-    content: '';
-    position: absolute;
-    left: 0; top: 0; bottom: 0;
-    width: 3px;
-    border-radius: 3px 0 0 3px;
+    content: ''; position: absolute;
+    left: 0; top: 0; bottom: 0; width: 4px; border-radius: 4px 0 0 4px;
 }
-.meal-card-can::before { background: linear-gradient(to bottom, #4a6fdc, #6382d3); }
-.meal-card-berrin::before { background: linear-gradient(to bottom, #c06fa0, #d47bb5); }
-
-.meal-label {
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    margin-bottom: 0.3rem;
-    opacity: 0.6;
+.mc-can::before    { background: linear-gradient(to bottom,#3b82f6,#6366f1); }
+.mc-berrin::before { background: linear-gradient(to bottom,#ec4899,#f472b6); }
+.meal-tag {
+    font-size: 0.68rem; font-weight: 700;
+    letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 0.25rem;
 }
-.meal-label-can { color: #6382d3; }
-.meal-label-berrin { color: #d47bb5; }
-
-.meal-content {
-    font-size: 0.95rem;
-    line-height: 1.6;
-    color: #d0d0c8;
-    font-weight: 400;
-}
-.meal-icon {
-    position: absolute;
-    right: 1rem; top: 50%;
-    transform: translateY(-50%);
-    font-size: 1.6rem;
-    opacity: 0.15;
+.mt-can    { color: #3b82f6; }
+.mt-berrin { color: #ec4899; }
+.meal-text { font-size: 0.93rem; line-height: 1.6; color: #374151; }
+.meal-icon-bg {
+    position: absolute; right: 0.9rem; top: 50%;
+    transform: translateY(-50%); font-size: 1.7rem; opacity: 0.12;
 }
 
-/* ── Notes Card ── */
 .notes-card {
-    background: linear-gradient(135deg, #1e1a10, #1a1a14);
-    border: 1px solid rgba(255,200,50,0.15);
-    border-radius: 14px;
-    padding: 1rem 1.2rem;
-    margin-top: 0.8rem;
+    background: #fffbeb; border: 1px solid #fde68a;
+    border-radius: 12px; padding: 0.8rem 1rem; margin-top: 0.5rem;
 }
-.notes-label {
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: #c8a84a;
-    margin-bottom: 0.3rem;
-}
-.notes-content {
-    color: #c8c0a0;
-    font-size: 0.9rem;
-    line-height: 1.6;
-}
+.notes-tag  { font-size: 0.68rem; font-weight: 700; color: #d97706; letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 0.2rem; }
+.notes-text { font-size: 0.9rem; color: #78350f; line-height: 1.6; }
 
-/* ── Empty State ── */
-.empty-state {
-    text-align: center;
-    padding: 4rem 2rem;
-    color: #4a4d5a;
+.empty-box {
+    text-align: center; background: #fff;
+    border: 2px dashed #d1d5db; border-radius: 16px;
+    padding: 3.5rem 2rem; color: #9ca3af;
 }
-.empty-state .icon { font-size: 3rem; margin-bottom: 1rem; }
-.empty-state p { font-size: 1.1rem; }
+.empty-box .ei { font-size: 2.5rem; margin-bottom: 0.5rem; }
 
-/* ── Weekly Table ── */
-.weekly-section {
-    margin-top: 3rem;
-    padding-top: 2rem;
-    border-top: 1px solid rgba(255,255,255,0.07);
+.shop-category {
+    font-family: 'Nunito', sans-serif; font-size: 0.75rem;
+    font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase;
+    color: #6b7280; margin: 1.4rem 0 0.5rem;
+    padding-bottom: 0.3rem; border-bottom: 2px solid #e8eaf0;
 }
-.weekly-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #8a8d9a;
-    margin-bottom: 1.2rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+.shop-item {
+    display: flex; align-items: center; gap: 0.8rem;
+    background: #fff; border: 1px solid #e8eaf0; border-radius: 10px;
+    padding: 0.65rem 1rem; margin-bottom: 0.45rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
-.stDataFrame { border-radius: 12px; overflow: hidden; }
+.shop-item.checked { background: #f0fdf4; border-color: #bbf7d0; opacity: 0.7; }
+.shop-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.shop-name { font-size: 0.95rem; font-weight: 500; color: #1f2937; flex: 1; }
+.shop-name.done { text-decoration: line-through; color: #9ca3af; }
+.shop-qty  { font-size: 0.82rem; color: #6b7280; background: #f3f4f6; padding: 0.15rem 0.6rem; border-radius: 20px; }
 
-/* Divider */
-.col-divider {
-    width: 1px;
-    background: rgba(255,255,255,0.07);
-    margin: 0 0.5rem;
+.stats-bar { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.stat-chip {
+    background: #fff; border: 1px solid #e8eaf0; border-radius: 10px;
+    padding: 0.5rem 1rem; font-size: 0.85rem; color: #374151;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
+.stat-chip b { color: #2d6a4f; font-family: 'Nunito', sans-serif; }
 
-/* Streamlit column gap */
-[data-testid="column"] { padding: 0 0.8rem; }
+.mail-status-ok  { background:#d1fae5; color:#065f46; padding:0.5rem 1rem; border-radius:8px; font-size:0.85rem; font-weight:600; }
+.mail-status-err { background:#fee2e2; color:#991b1b; padding:0.5rem 1rem; border-radius:8px; font-size:0.85rem; font-weight:600; }
 </style>
 """, unsafe_allow_html=True)
 
 
 # ─── DATA LOADING ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=60)
-def load_data():
-    url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
-    df = pd.read_csv(url)
-    return df
+def load_diyet():
+    url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={GID_DIYET}"
+    df  = pd.read_csv(url)
+    df.columns = ["Gün","Öğün","Can","Berrin","Notlar"][:len(df.columns)]
+    return df.dropna(subset=["Gün","Öğün"])
+
+@st.cache_data(ttl=60)
+def load_alisveris():
+    url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={GID_ALISV}"
+    df  = pd.read_csv(url)
+    df.columns = ["Kategori","Ürün","Miktar","Durum"][:len(df.columns)]
+    return df.dropna(subset=["Ürün"])
 
 
 # ─── HELPERS ──────────────────────────────────────────────────────────────────
-GUNLER = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
-
-OGÜN_ICONS = {
-    "kahvaltı": "☀️",
-    "öğle":     "🌤️",
-    "akşam":    "🌙",
-    "ara öğün": "🍎",
-    "atıştırma":"🍎",
-    "gece":     "🌙",
+GUNLER     = ["Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi","Pazar"]
+GUN_EMOJIS = ["🌿","🔥","💧","⚡","🌸","☀️","🌙"]
+OGÜN_ICONS = {"kahvaltı":"☀️","öğle":"🌤️","akşam":"🌙","ara":"🍎","atıştırma":"🍎","gece":"🌙"}
+KAT_COLORS = {
+    "protein":"#f97316","süt":"#3b82f6","kasap":"#ef4444",
+    "kuru":"#a855f7","kuruyemiş":"#f59e0b",
+    "sebze":"#22c55e","meyve":"#ec4899","içecek":"#06b6d4",
 }
 
-def get_meal_icon(ogün: str) -> str:
-    for key, icon in OGÜN_ICONS.items():
-        if key in str(ogün).lower():
-            return icon
+def meal_icon(ogün):
+    for k,v in OGÜN_ICONS.items():
+        if k in str(ogün).lower(): return v
     return "🍽️"
 
+def kat_color(kat):
+    kat_lower = str(kat).lower()
+    for k,v in KAT_COLORS.items():
+        if k in kat_lower: return v
+    return "#6b7280"
 
-# ─── MAIN APP ─────────────────────────────────────────────────────────────────
-try:
-    df = load_data()
+def build_mail_html(diyet_df, alisveris_df, gun):
+    plan   = diyet_df[diyet_df["Gün"].str.contains(gun, case=False, na=False)]
+    rows_d = "".join(
+        f"<tr>"
+        f"<td style='padding:7px 12px;border-bottom:1px solid #f0f0f0;color:#6b7280;font-size:13px'>{r['Öğün']}</td>"
+        f"<td style='padding:7px 12px;border-bottom:1px solid #f0f0f0;font-size:13px'>{r.get('Can','—')}</td>"
+        f"<td style='padding:7px 12px;border-bottom:1px solid #f0f0f0;font-size:13px'>{r.get('Berrin','—')}</td>"
+        f"</tr>"
+        for _, r in plan.iterrows()
+    )
+    rows_a = "".join(
+        f"<tr>"
+        f"<td style='padding:7px 12px;border-bottom:1px solid #f0f0f0;color:#6b7280;font-size:13px'>{r.get('Kategori','')}</td>"
+        f"<td style='padding:7px 12px;border-bottom:1px solid #f0f0f0;font-size:13px'><b>{r['Ürün']}</b></td>"
+        f"<td style='padding:7px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#9ca3af'>{r.get('Miktar','')}</td>"
+        f"</tr>"
+        for _, r in alisveris_df.iterrows()
+    )
+    tarih = datetime.now().strftime("%d.%m.%Y")
+    return f"""
+    <html><body style="font-family:Arial,sans-serif;background:#f5f7fa;padding:20px;margin:0">
+    <div style="max-width:620px;margin:auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1)">
+      <div style="background:linear-gradient(135deg,#2d6a4f,#40916c);padding:28px 32px;color:white">
+        <h2 style="margin:0;font-size:22px;font-weight:800">🥗 Can & Berrin Beslenme Planı</h2>
+        <p style="margin:8px 0 0;opacity:0.85;font-size:14px">{gun} · {tarih}</p>
+      </div>
+      <div style="padding:28px 32px">
+        <h3 style="font-size:15px;color:#2d6a4f;margin:0 0 12px;font-weight:800">📅 {gun} Beslenme Planı</h3>
+        <table width="100%" cellpadding="0" cellspacing="0"
+               style="border-collapse:collapse;border:1px solid #e8eaf0;border-radius:10px;overflow:hidden;margin-bottom:24px">
+          <thead><tr style="background:#f0fdf4">
+            <th style="padding:9px 12px;text-align:left;font-size:12px;color:#374151;font-weight:700">ÖĞÜN</th>
+            <th style="padding:9px 12px;text-align:left;font-size:12px;color:#1d4ed8;font-weight:700">🏃 CAN</th>
+            <th style="padding:9px 12px;text-align:left;font-size:12px;color:#be185d;font-weight:700">💃 BERRİN</th>
+          </tr></thead>
+          <tbody>{rows_d}</tbody>
+        </table>
 
-    # Sütun isimleri — Sheet sırası: Gün | Öğün | Can | Berrin | Notlar
-    col_map = ["Gün", "Öğün", "Can", "Berrin", "Notlar"]
-    df.columns = col_map[:len(df.columns)]
-    df = df.dropna(subset=["Gün", "Öğün"])
+        <h3 style="font-size:15px;color:#2d6a4f;margin:0 0 12px;font-weight:800">🛒 Haftalık Alışveriş Listesi</h3>
+        <table width="100%" cellpadding="0" cellspacing="0"
+               style="border-collapse:collapse;border:1px solid #e8eaf0;border-radius:10px;overflow:hidden">
+          <thead><tr style="background:#f0fdf4">
+            <th style="padding:9px 12px;text-align:left;font-size:12px;color:#374151;font-weight:700">KATEGORİ</th>
+            <th style="padding:9px 12px;text-align:left;font-size:12px;color:#374151;font-weight:700">ÜRÜN</th>
+            <th style="padding:9px 12px;text-align:left;font-size:12px;color:#374151;font-weight:700">MİKTAR</th>
+          </tr></thead>
+          <tbody>{rows_a}</tbody>
+        </table>
 
-    # Bugünü tespit et
-    bugun_no = datetime.now().weekday()
-    bugun_tr = GUNLER[bugun_no]
-
-    # Session state: seçili gün
-    if "secili_gun" not in st.session_state:
-        st.session_state.secili_gun = bugun_tr
-
-    # ── Hero ──────────────────────────────────────────────────────────────────
-    st.markdown(f"""
-    <div class="hero">
-        <div>
-            <div class="hero-title">Can & <span>Berrin</span><br>Beslenme Paneli</div>
-            <div class="hero-sub">Haftalık diyet programınız, günlük takip</div>
-        </div>
-        <div class="day-badge">📅 {bugun_tr}</div>
+        <p style="color:#9ca3af;font-size:11px;margin-top:24px;text-align:center;border-top:1px solid #f0f0f0;padding-top:16px">
+          Can & Berrin Beslenme Paneli · Otomatik gönderim · {tarih}
+        </p>
+      </div>
     </div>
-    """, unsafe_allow_html=True)
+    </body></html>"""
 
-    # ── Gün Seçici ────────────────────────────────────────────────────────────
-    st.markdown('<div class="day-nav">', unsafe_allow_html=True)
-    cols = st.columns(len(GUNLER))
-    for i, gun in enumerate(GUNLER):
-        is_today = gun == bugun_tr
-        is_active = gun == st.session_state.secili_gun
-        label = f"{'📍 ' if is_today else ''}{gun}"
-        with cols[i]:
-            btn_type = "primary" if is_active else "secondary"
-            if st.button(label, key=f"btn_{gun}", type=btn_type, use_container_width=True):
+def send_email(recipients: list, subject: str, html_body: str):
+    """SMTP_USER ve SMTP_PASS Streamlit Secrets'tan gelir."""
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"]    = SMTP_USER
+    msg["To"]      = ", ".join(recipients)
+    msg.attach(MIMEText(html_body, "html", "utf-8"))
+    with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as srv:
+        srv.login(SMTP_USER, SMTP_PASS)
+        srv.sendmail(SMTP_USER, recipients, msg.as_string())
+
+
+# ─── SESSION STATE ────────────────────────────────────────────────────────────
+if "secili_gun"    not in st.session_state:
+    st.session_state.secili_gun    = GUNLER[datetime.now().weekday()]
+if "checked_items" not in st.session_state:
+    st.session_state.checked_items = set()
+if "mail_to"       not in st.session_state:
+    st.session_state.mail_to       = ""
+
+
+# ─── SIDEBAR ──────────────────────────────────────────────────────────────────
+with st.sidebar:
+    st.markdown('<div class="sidebar-logo">🥗 Beslenme Paneli</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-sub">Can & Berrin · Haftalık Plan</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="sidebar-section">Menü</div>', unsafe_allow_html=True)
+    page = st.radio("", ["🥦 Günlük Beslenme", "🛒 Alışveriş Listesi"],
+                    label_visibility="collapsed")
+
+    if "Beslenme" in page:
+        st.markdown('<div class="sidebar-section">Gün Seç</div>', unsafe_allow_html=True)
+        bugun_sidebar = GUNLER[datetime.now().weekday()]
+        for i, gun in enumerate(GUNLER):
+            label    = f"{GUN_EMOJIS[i]} {gun}{'  📍' if gun == bugun_sidebar else ''}"
+            btn_type = "primary" if gun == st.session_state.secili_gun else "secondary"
+            if st.button(label, key=f"nav_{gun}", type=btn_type, use_container_width=True):
                 st.session_state.secili_gun = gun
                 st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Seçili Günün Planı ────────────────────────────────────────────────────
-    secili = st.session_state.secili_gun
-    plan = df[df["Gün"].str.contains(secili, case=False, na=False)]
-
-    if plan.empty:
-        st.markdown(f"""
-        <div class="empty-state">
-            <div class="icon">📭</div>
-            <p><strong>{secili}</strong> için henüz plan girilmemiş.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        col_can, col_berrin = st.columns([1, 1], gap="large")
-
-        with col_can:
-            st.markdown("""
-            <div class="person-header">
-                <div class="person-avatar avatar-can">C</div>
-                <div class="person-name">Can</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            for _, row in plan.iterrows():
-                ogün = row.get("Öğün", "")
-                detay = row.get("Can", "—")
-                icon = get_meal_icon(ogün)
-                has_notes = "Notlar" in row and pd.notna(row.get("Notlar", None))
-
-                st.markdown(f"""
-                <div class="meal-card meal-card-can">
-                    <div class="meal-label meal-label-can">{ogün}</div>
-                    <div class="meal-content">{detay}</div>
-                    <div class="meal-icon">{icon}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-        with col_berrin:
-            st.markdown("""
-            <div class="person-header">
-                <div class="person-avatar avatar-berrin">B</div>
-                <div class="person-name">Berrin</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            for _, row in plan.iterrows():
-                ogün = row.get("Öğün", "")
-                detay = row.get("Berrin", "—")
-                icon = get_meal_icon(ogün)
-
-                st.markdown(f"""
-                <div class="meal-card meal-card-berrin">
-                    <div class="meal-label meal-label-berrin">{ogün}</div>
-                    <div class="meal-content">{detay}</div>
-                    <div class="meal-icon">{icon}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-        # Ortak notlar (eğer varsa)
-        if "Notlar" in df.columns:
-            notlar = plan["Notlar"].dropna().unique()
-            notlar = [n for n in notlar if str(n).strip() not in ("", "nan")]
-            if notlar:
-                for not_metni in notlar:
-                    st.markdown(f"""
-                    <div class="notes-card">
-                        <div class="notes-label">📌 Notlar</div>
-                        <div class="notes-content">{not_metni}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-    # ── Haftalık Özet ─────────────────────────────────────────────────────────
-    st.markdown('<div class="weekly-section">', unsafe_allow_html=True)
-    st.markdown('<div class="weekly-title">📋 Tüm Haftalık Program</div>', unsafe_allow_html=True)
-    with st.expander("Tabloyu Görüntüle / Gizle", expanded=False):
-        st.dataframe(
-            df,
-            use_container_width=True,
-            hide_index=True,
-        )
-    st.markdown('</div>', unsafe_allow_html=True)
-
-except Exception as e:
-    st.error(f"🔴 Veri çekme hatası: {e}")
-    st.info(
-        "Google Sheet'te **'Bağlantıya sahip olan herkes görüntüleyebilir'** "
-        "ayarının açık olduğunu kontrol edin."
+    # Mail alıcı ayarı
+    st.markdown('<div class="sidebar-section">Mail Alıcıları</div>', unsafe_allow_html=True)
+    mail_to_input = st.text_input(
+        "Alıcılar (virgülle ayır)",
+        value=st.session_state.mail_to,
+        placeholder="can3460@gmail.com, diger@mail.com",
+        key="mail_to_input",
+        label_visibility="collapsed",
     )
+    st.session_state.mail_to = mail_to_input
+
+    if SMTP_USER:
+        st.caption(f"📤 Gönderici: `{SMTP_USER}`")
+    else:
+        st.warning("⚠️ SMTP_USER Secrets'ta tanımlı değil.")
+
+
+# ─── LOAD DATA ────────────────────────────────────────────────────────────────
+try:
+    df_diyet = load_diyet()
+    df_alisv = load_alisveris()
+    data_ok  = True
+except Exception as e:
+    data_ok = False
+    st.error(f"🔴 Veri yüklenemedi: {e}")
+    st.info("Google Sheet'te **Bağlantıya sahip herkes görüntüleyebilir** ayarının açık olduğunu kontrol edin.")
+
+if data_ok:
+
+    # ── Sağ üst: Mail Gönder ──────────────────────────────────────────────────
+    _, btn_col = st.columns([8, 1])
+    with btn_col:
+        send_clicked = st.button("📧 Mail Gönder", type="primary", use_container_width=True)
+
+    if send_clicked:
+        recipients = [x.strip() for x in st.session_state.mail_to.split(",") if x.strip()]
+        if not SMTP_USER or not SMTP_PASS:
+            st.error("❌ SMTP_USER veya SMTP_PASS Streamlit Secrets'ta bulunamadı.")
+        elif not recipients:
+            st.warning("⚠️ Sol menüden en az bir alıcı e-posta adresi girin.")
+        else:
+            with st.spinner("📨 Mail gönderiliyor..."):
+                try:
+                    html = build_mail_html(df_diyet, df_alisv, st.session_state.secili_gun)
+                    send_email(
+                        recipients,
+                        f"🥗 {st.session_state.secili_gun} · Beslenme Planı & Alışveriş Listesi",
+                        html,
+                    )
+                    st.success(f"✅ Mail başarıyla gönderildi → {', '.join(recipients)}")
+                except Exception as ex:
+                    st.error(f"❌ Mail gönderilemedi: {ex}")
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # SAYFA 1 — GÜNLÜK BESLENME
+    # ══════════════════════════════════════════════════════════════════════════
+    if "Beslenme" in page:
+        secili = st.session_state.secili_gun
+        bugun  = GUNLER[datetime.now().weekday()]
+        plan   = df_diyet[df_diyet["Gün"].str.contains(secili, case=False, na=False)]
+
+        st.markdown(f"""
+        <div class="page-header">
+          <div class="page-title">📅 <span>{secili}</span> Beslenme Planı</div>
+          {'<div class="today-chip">✅ Bugün</div>' if secili == bugun else ''}
+        </div>""", unsafe_allow_html=True)
+
+        if plan.empty:
+            st.markdown(f'<div class="empty-box"><div class="ei">📭</div><p><b>{secili}</b> için henüz plan girilmemiş.</p></div>', unsafe_allow_html=True)
+        else:
+            st.markdown(
+                f'<div class="stats-bar">'
+                f'<div class="stat-chip">🍽️ <b>{len(plan)}</b> öğün</div>'
+                f'<div class="stat-chip">📅 <b>{secili}</b></div>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+
+            c1, c2 = st.columns(2, gap="large")
+            with c1:
+                st.markdown('<div class="person-header ph-can"><div class="avatar av-can">C</div><div class="person-name pn-can">Can</div></div>', unsafe_allow_html=True)
+                for _, row in plan.iterrows():
+                    st.markdown(
+                        f'<div class="meal-card mc-can">'
+                        f'<div class="meal-tag mt-can">{row["Öğün"]}</div>'
+                        f'<div class="meal-text">{row.get("Can","—")}</div>'
+                        f'<div class="meal-icon-bg">{meal_icon(row["Öğün"])}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+            with c2:
+                st.markdown('<div class="person-header ph-berrin"><div class="avatar av-berrin">B</div><div class="person-name pn-berrin">Berrin</div></div>', unsafe_allow_html=True)
+                for _, row in plan.iterrows():
+                    st.markdown(
+                        f'<div class="meal-card mc-berrin">'
+                        f'<div class="meal-tag mt-berrin">{row["Öğün"]}</div>'
+                        f'<div class="meal-text">{row.get("Berrin","—")}</div>'
+                        f'<div class="meal-icon-bg">{meal_icon(row["Öğün"])}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+
+            if "Notlar" in df_diyet.columns:
+                notlar = [n for n in plan["Notlar"].dropna().unique() if str(n).strip() not in ("","nan")]
+                for n in notlar:
+                    st.markdown(f'<div class="notes-card"><div class="notes-tag">📌 Not</div><div class="notes-text">{n}</div></div>', unsafe_allow_html=True)
+
+        with st.expander("📋 Tüm Haftalık Programı Gör"):
+            st.dataframe(df_diyet, use_container_width=True, hide_index=True)
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # SAYFA 2 — ALIŞVERİŞ LİSTESİ
+    # ══════════════════════════════════════════════════════════════════════════
+    elif "Alışveriş" in page:
+        total   = len(df_alisv)
+        checked = len(st.session_state.checked_items)
+
+        st.markdown(f"""
+        <div class="page-header">
+          <div class="page-title">🛒 Haftalık <span>Alışveriş</span> Listesi</div>
+          <div class="today-chip">{checked}/{total} tamamlandı</div>
+        </div>""", unsafe_allow_html=True)
+
+        st.progress(checked / total if total > 0 else 0)
+
+        _, rc = st.columns([6, 1])
+        with rc:
+            if st.button("🔄 Sıfırla", use_container_width=True):
+                st.session_state.checked_items = set()
+                st.rerun()
+
+        for kat in df_alisv["Kategori"].fillna("Diğer").unique():
+            items = df_alisv[df_alisv["Kategori"].fillna("Diğer") == kat]
+            color = kat_color(kat)
+            st.markdown(
+                f'<div class="shop-category">'
+                f'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;'
+                f'background:{color};margin-right:6px;vertical-align:middle"></span>{kat}</div>',
+                unsafe_allow_html=True
+            )
+            for _, row in items.iterrows():
+                key     = f"{kat}_{row['Ürün']}"
+                is_done = key in st.session_state.checked_items
+                ic, cc  = st.columns([10, 1])
+                with ic:
+                    dc = "done" if is_done else ""
+                    ch = "checked" if is_done else ""
+                    st.markdown(
+                        f'<div class="shop-item {ch}">'
+                        f'<div class="shop-dot" style="background:{color}"></div>'
+                        f'<div class="shop-name {dc}">{row["Ürün"]}</div>'
+                        f'<div class="shop-qty">{row.get("Miktar","")}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+                with cc:
+                    val = st.checkbox("", value=is_done, key=f"chk_{key}", label_visibility="collapsed")
+                    if val != is_done:
+                        if val: st.session_state.checked_items.add(key)
+                        else:   st.session_state.checked_items.discard(key)
+                        st.rerun()
