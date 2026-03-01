@@ -70,15 +70,15 @@ button[kind="headerNoPadding"] svg,
     font-weight: 900; font-size: 1.2rem; color: #065f46;
     line-height: 1.2;
 }
-.logo-sub { font-size: 0.76rem; color: #94a3b8; margin-top: 2px; }
+.logo-sub { font-size: 0.76rem; color: #64748b; margin-top: 2px; font-weight: 600; }
 
 .nav-label {
-    font-size: 0.63rem; font-weight: 700; letter-spacing: 0.12em;
-    text-transform: uppercase; color: #94a3b8;
+    font-size: 0.65rem; font-weight: 800; letter-spacing: 0.12em;
+    text-transform: uppercase; color: #475569 !important; /* DAHA KOYU VE OKUNUR */
     margin: 1.4rem 0 0.45rem;
 }
 
-/* ── Profil Seçici (Radyo Buton) Şıklaştırma ── */
+/* ── Profil Seçici ve Radyo Buton Okunabilirlik Fix ── */
 div[role="radiogroup"] > label {
     background-color: #f1f5f9;
     padding: 10px 15px;
@@ -86,9 +86,22 @@ div[role="radiogroup"] > label {
     border: 1px solid #e2e8f0;
     margin-bottom: 5px;
     transition: all 0.2s ease;
+    color: #0f172a !important; /* KOYU FONT ZORUNLULUĞU */
 }
 div[role="radiogroup"] > label:hover {
     background-color: #e2e8f0;
+}
+div[role="radiogroup"] > label * {
+    color: #0f172a !important; /* İÇİNDEKİ YAZILAR DA KOYU */
+    font-weight: 600 !important;
+}
+
+/* ── Text Input (Mail) Okunabilirlik Fix ── */
+[data-testid="stTextInput"] input {
+    color: #0f172a !important;
+    background-color: #f8fafc !important;
+    border: 1px solid #cbd5e1 !important;
+    font-weight: 500;
 }
 
 /* ── Info Pills ── */
@@ -126,7 +139,7 @@ div[role="radiogroup"] > label:hover {
 }
 .ph-can    { background: #eff6ff; border: 1px solid #bfdbfe; }
 .ph-berrin { background: #fdf2f8; border: 1px solid #fbcfe8; }
-.ph-gulten { background: #f3e8ff; border: 1px solid #e9d5ff; } /* GÜLTEN İÇİN MOR TEMA */
+.ph-gulten { background: #f3e8ff; border: 1px solid #e9d5ff; }
 
 .avatar {
     width: 40px; height: 40px; border-radius: 50%;
@@ -136,12 +149,12 @@ div[role="radiogroup"] > label:hover {
 }
 .av-can    { background: linear-gradient(135deg, #3b82f6, #6366f1); }
 .av-berrin { background: linear-gradient(135deg, #ec4899, #f472b6); }
-.av-gulten { background: linear-gradient(135deg, #a855f7, #d946ef); } /* GÜLTEN AVATAR */
+.av-gulten { background: linear-gradient(135deg, #a855f7, #d946ef); }
 
 .p-name { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1.1rem; }
 .pn-can    { color: #1d4ed8; }
 .pn-berrin { color: #be185d; }
-.pn-gulten { color: #7e22ce; } /* GÜLTEN İSİM */
+.pn-gulten { color: #7e22ce; }
 
 /* ── Meal Card ── */
 .meal-card {
@@ -161,7 +174,7 @@ div[role="radiogroup"] > label:hover {
 }
 .mc-can::before    { background: linear-gradient(to bottom, #3b82f6, #818cf8); }
 .mc-berrin::before { background: linear-gradient(to bottom, #ec4899, #f9a8d4); }
-.mc-gulten::before { background: linear-gradient(to bottom, #a855f7, #e879f9); } /* GÜLTEN KART ÇİZGİSİ */
+.mc-gulten::before { background: linear-gradient(to bottom, #a855f7, #e879f9); }
 
 .meal-ogün {
     font-size: 0.65rem; font-weight: 700;
@@ -169,7 +182,7 @@ div[role="radiogroup"] > label:hover {
 }
 .mo-can    { color: #3b82f6; }
 .mo-berrin { color: #ec4899; }
-.mo-gulten { color: #a855f7; } /* GÜLTEN ÖĞÜN RENGİ */
+.mo-gulten { color: #a855f7; }
 
 .meal-content { font-size: 0.95rem; font-weight: 500; color: #1e293b; line-height: 1.55; }
 .meal-bg-icon {
@@ -340,7 +353,6 @@ def build_html(diyet_df, alisv_df, gun, profil):
           </tr></thead><tbody>{rows_d}</tbody>
         </table>"""
     else:
-        # GÜLTEN'İN YENİ BAŞLIĞINI EKLİYORUZ ("Gulten Beslenme Programi")
         c_gulten = col_find(diyet_df, "Gulten Beslenme Programi", "Gülten", "Gulten")
         rows_d = "".join(
             f"<tr>"
@@ -406,10 +418,11 @@ if "secili_gun"    not in st.session_state:
     st.session_state.secili_gun    = GUNLER[datetime.now().weekday()]
 if "checked_items" not in st.session_state:
     st.session_state.checked_items = set()
-if "mail_to"       not in st.session_state:
-    st.session_state.mail_to       = ""
 if "aktif_profil"  not in st.session_state:
     st.session_state.aktif_profil  = "Can & Berrin"
+# Yeni ekleme: Profillere göre ayrı ayrı mail hafızası
+if "mail_to_dict"  not in st.session_state:
+    st.session_state.mail_to_dict  = {"Can & Berrin": "", "Gülten": ""}
 
 
 # ─── SIDEBAR ──────────────────────────────────────────────────────────────────
@@ -452,14 +465,17 @@ with st.sidebar:
                 st.session_state.secili_gun = gun
                 st.rerun()
 
-    # ── Mail Alıcıları ──
+    # ── Mail Alıcıları (Profile Göre Dinamik) ──
     st.markdown('<div class="nav-label">Mail Alıcıları</div>', unsafe_allow_html=True)
+    current_prof = st.session_state.aktif_profil
     mail_to = st.text_input(
-        "", value=st.session_state.mail_to,
+        "", value=st.session_state.mail_to_dict[current_prof],
         placeholder="a@gmail.com, b@gmail.com",
-        key="mail_to_input", label_visibility="collapsed"
+        key=f"mail_to_input_{current_prof}", 
+        label_visibility="collapsed"
     )
-    st.session_state.mail_to = mail_to
+    # Seçili profilin sözlüğüne kaydet
+    st.session_state.mail_to_dict[current_prof] = mail_to
 
     if SMTP_USER:
         st.caption(f"📤 Gönderici: `{SMTP_USER}`")
@@ -488,11 +504,13 @@ c_not    = col_find(df_diyet, "Not")
 _, mail_col = st.columns([8, 1])
 with mail_col:
     if st.button("📧 Mail", type="primary", use_container_width=True):
-        rcpts = [x.strip() for x in st.session_state.mail_to.split(",") if x.strip()]
+        # Sadece seçili olan profilin mail listesini alıyoruz
+        rcpts = [x.strip() for x in st.session_state.mail_to_dict[st.session_state.aktif_profil].split(",") if x.strip()]
+        
         if not SMTP_USER or not SMTP_PASS:
             st.error("❌ Secrets'ta SMTP_USER / SMTP_PASS eksik.")
         elif not rcpts:
-            st.warning("⚠️ Sol menüden alıcı e-posta girin.")
+            st.warning(f"⚠️ Sol menüden {st.session_state.aktif_profil} için e-posta girin.")
         else:
             with st.spinner("Gönderiliyor..."):
                 try:
@@ -602,7 +620,6 @@ if "Beslenme" in page:
             draw_person(col_left,  c_can,    "ph-can",    "av-can",    "pn-can",    "🏃 Can",    "mo-can",    "mc-can")
             draw_person(col_right, c_berrin, "ph-berrin", "av-berrin", "pn-berrin", "💃 Berrin", "mo-berrin", "mc-berrin")
         else:
-            # GÜLTEN'İN YENİ BAŞLIĞINI BURAYA DA İŞLEDİK
             c_gulten = col_find(df_diyet, "Gulten Beslenme Programi", "Gülten", "Gulten")
             col_center, _ = st.columns([1.5, 1]) 
             draw_person(col_center, c_gulten, "ph-gulten", "av-gulten", "pn-gulten", "👑 Gülten", "mo-gulten", "mc-gulten")
