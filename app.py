@@ -7,7 +7,8 @@ from datetime import datetime
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
 SHEET_ID  = "1KhfoB6QShha7wW64oSjLsUna5BgBjFoo6-wWkl_-ny8"
-GID_DIYET = "0"
+GID_DIYET_CB = "0"              # Can ve Berrin'in Sayfası
+GID_DIYET_GULTEN = "120321117"  # Gülten'in Sayfası
 GID_ALISV = "1768296250"
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 465
@@ -77,6 +78,19 @@ button[kind="headerNoPadding"] svg,
     margin: 1.4rem 0 0.45rem;
 }
 
+/* ── Profil Seçici (Radyo Buton) Şıklaştırma ── */
+div[role="radiogroup"] > label {
+    background-color: #f1f5f9;
+    padding: 10px 15px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 5px;
+    transition: all 0.2s ease;
+}
+div[role="radiogroup"] > label:hover {
+    background-color: #e2e8f0;
+}
+
 /* ── Info Pills ── */
 .info-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 1.8rem; }
 .info-pill {
@@ -112,6 +126,8 @@ button[kind="headerNoPadding"] svg,
 }
 .ph-can    { background: #eff6ff; border: 1px solid #bfdbfe; }
 .ph-berrin { background: #fdf2f8; border: 1px solid #fbcfe8; }
+.ph-gulten { background: #f3e8ff; border: 1px solid #e9d5ff; } /* GÜLTEN İÇİN MOR TEMA */
+
 .avatar {
     width: 40px; height: 40px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
@@ -120,9 +136,12 @@ button[kind="headerNoPadding"] svg,
 }
 .av-can    { background: linear-gradient(135deg, #3b82f6, #6366f1); }
 .av-berrin { background: linear-gradient(135deg, #ec4899, #f472b6); }
+.av-gulten { background: linear-gradient(135deg, #a855f7, #d946ef); } /* GÜLTEN AVATAR */
+
 .p-name { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1.1rem; }
 .pn-can    { color: #1d4ed8; }
 .pn-berrin { color: #be185d; }
+.pn-gulten { color: #7e22ce; } /* GÜLTEN İSİM */
 
 /* ── Meal Card ── */
 .meal-card {
@@ -142,6 +161,7 @@ button[kind="headerNoPadding"] svg,
 }
 .mc-can::before    { background: linear-gradient(to bottom, #3b82f6, #818cf8); }
 .mc-berrin::before { background: linear-gradient(to bottom, #ec4899, #f9a8d4); }
+.mc-gulten::before { background: linear-gradient(to bottom, #a855f7, #e879f9); } /* GÜLTEN KART ÇİZGİSİ */
 
 .meal-ogün {
     font-size: 0.65rem; font-weight: 700;
@@ -149,6 +169,8 @@ button[kind="headerNoPadding"] svg,
 }
 .mo-can    { color: #3b82f6; }
 .mo-berrin { color: #ec4899; }
+.mo-gulten { color: #a855f7; } /* GÜLTEN ÖĞÜN RENGİ */
+
 .meal-content { font-size: 0.95rem; font-weight: 500; color: #1e293b; line-height: 1.55; }
 .meal-bg-icon {
     position: absolute; right: 12px; top: 50%;
@@ -221,8 +243,8 @@ button[kind="headerNoPadding"] svg,
 
 # ─── DATA LOADING ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=30)
-def load_diyet():
-    url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={GID_DIYET}"
+def load_diyet(gid):
+    url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={gid}"
     df  = pd.read_csv(url)
     df.columns = [str(c).strip() for c in df.columns]
     df = df.fillna("")
@@ -292,25 +314,48 @@ def clean(val):
 
 
 # ─── MAIL ─────────────────────────────────────────────────────────────────────
-def build_html(diyet_df, alisv_df, gun):
-    c_can    = col_find(diyet_df, "Can")
-    c_berrin = col_find(diyet_df, "Berrin")
+def build_html(diyet_df, alisv_df, gun, profil):
     c_gun_col = col_find(diyet_df, "Gün")
     c_ogün_col = col_find(diyet_df, "Öğün", "Ogun")
-
+    
     plan = diyet_df[diyet_df[c_gun_col].astype(str).str.contains(gun, case=False, na=False)] if c_gun_col else diyet_df
+    tarih = datetime.now().strftime("%d.%m.%Y")
 
-    rows_d = "".join(
-        f"<tr>"
-        f"<td style='padding:7px 12px;border-bottom:1px solid #f1f5f9;color:#64748b;font-size:13px'>"
-        f"{clean(r[c_ogün_col]) if c_ogün_col else ''}</td>"
-        f"<td style='padding:7px 12px;border-bottom:1px solid #f1f5f9;font-size:13px'>"
-        f"{clean(r[c_can]) if c_can else '—'}</td>"
-        f"<td style='padding:7px 12px;border-bottom:1px solid #f1f5f9;font-size:13px'>"
-        f"{clean(r[c_berrin]) if c_berrin else '—'}</td>"
-        f"</tr>"
-        for _, r in plan.iterrows()
-    )
+    if profil == "Can & Berrin":
+        c_can    = col_find(diyet_df, "Can")
+        c_berrin = col_find(diyet_df, "Berrin")
+        rows_d = "".join(
+            f"<tr>"
+            f"<td style='padding:7px 12px;border-bottom:1px solid #f1f5f9;color:#64748b;font-size:13px'>{clean(r[c_ogün_col]) if c_ogün_col else ''}</td>"
+            f"<td style='padding:7px 12px;border-bottom:1px solid #f1f5f9;font-size:13px'>{clean(r[c_can]) if c_can else '—'}</td>"
+            f"<td style='padding:7px 12px;border-bottom:1px solid #f1f5f9;font-size:13px'>{clean(r[c_berrin]) if c_berrin else '—'}</td>"
+            f"</tr>" for _, r in plan.iterrows()
+        )
+        table_html = f"""
+        <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:28px">
+          <thead><tr style="background:#f0fdf4">
+            <th style="padding:9px 12px;text-align:left;font-size:11px;color:#475569;font-weight:700;text-transform:uppercase">ÖĞÜN</th>
+            <th style="padding:9px 12px;text-align:left;font-size:11px;color:#1d4ed8;font-weight:700;text-transform:uppercase">🏃 CAN</th>
+            <th style="padding:9px 12px;text-align:left;font-size:11px;color:#be185d;font-weight:700;text-transform:uppercase">💃 BERRİN</th>
+          </tr></thead><tbody>{rows_d}</tbody>
+        </table>"""
+    else:
+        # GÜLTEN'İN YENİ BAŞLIĞINI EKLİYORUZ ("Gulten Beslenme Programi")
+        c_gulten = col_find(diyet_df, "Gulten Beslenme Programi", "Gülten", "Gulten")
+        rows_d = "".join(
+            f"<tr>"
+            f"<td style='padding:7px 12px;border-bottom:1px solid #f1f5f9;color:#64748b;font-size:13px'>{clean(r[c_ogün_col]) if c_ogün_col else ''}</td>"
+            f"<td style='padding:7px 12px;border-bottom:1px solid #f1f5f9;font-size:13px'>{clean(r[c_gulten]) if c_gulten else '—'}</td>"
+            f"</tr>" for _, r in plan.iterrows()
+        )
+        table_html = f"""
+        <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:28px">
+          <thead><tr style="background:#f3e8ff">
+            <th style="padding:9px 12px;text-align:left;font-size:11px;color:#475569;font-weight:700;text-transform:uppercase">ÖĞÜN</th>
+            <th style="padding:9px 12px;text-align:left;font-size:11px;color:#7e22ce;font-weight:700;text-transform:uppercase">👑 GÜLTEN</th>
+          </tr></thead><tbody>{rows_d}</tbody>
+        </table>"""
+
     rows_a = "".join(
         f"<tr>"
         f"<td style='padding:7px 12px;border-bottom:1px solid #f1f5f9;color:#64748b;font-size:13px'>{r.get('Kategori','')}</td>"
@@ -319,24 +364,16 @@ def build_html(diyet_df, alisv_df, gun):
         f"</tr>"
         for _, r in alisv_df.iterrows()
     )
-    tarih = datetime.now().strftime("%d.%m.%Y")
+    
     return f"""<html><body style="font-family:Arial,sans-serif;background:#f0f4f8;padding:24px;margin:0">
     <div style="max-width:640px;margin:auto;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.10)">
       <div style="background:linear-gradient(135deg,#065f46,#059669);padding:30px 32px;color:#fff">
-        <h2 style="margin:0;font-size:22px;font-weight:900">🥗 Can & Berrin Beslenme Planı</h2>
+        <h2 style="margin:0;font-size:22px;font-weight:900">🥗 {profil} Beslenme Planı</h2>
         <p style="margin:8px 0 0;opacity:0.8;font-size:14px">{gun} · {tarih}</p>
       </div>
       <div style="padding:28px 32px">
         <h3 style="font-size:15px;color:#059669;margin:0 0 14px;font-weight:800">📅 {gun} Beslenme Planı</h3>
-        <table width="100%" cellpadding="0" cellspacing="0"
-               style="border-collapse:collapse;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:28px">
-          <thead><tr style="background:#f0fdf4">
-            <th style="padding:9px 12px;text-align:left;font-size:11px;color:#475569;font-weight:700;text-transform:uppercase">ÖĞÜN</th>
-            <th style="padding:9px 12px;text-align:left;font-size:11px;color:#1d4ed8;font-weight:700;text-transform:uppercase">🏃 CAN</th>
-            <th style="padding:9px 12px;text-align:left;font-size:11px;color:#be185d;font-weight:700;text-transform:uppercase">💃 BERRİN</th>
-          </tr></thead>
-          <tbody>{rows_d}</tbody>
-        </table>
+        {table_html}
         <h3 style="font-size:15px;color:#059669;margin:0 0 14px;font-weight:800">🛒 Haftalık Alışveriş Listesi</h3>
         <table width="100%" cellpadding="0" cellspacing="0"
                style="border-collapse:collapse;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
@@ -348,7 +385,7 @@ def build_html(diyet_df, alisv_df, gun):
           <tbody>{rows_a}</tbody>
         </table>
         <p style="color:#94a3b8;font-size:11px;margin-top:24px;text-align:center;padding-top:16px;border-top:1px solid #f1f5f9">
-          Can & Berrin Beslenme Paneli · {tarih}
+          Beslenme Paneli · {tarih}
         </p>
       </div>
     </div></body></html>"""
@@ -371,16 +408,29 @@ if "checked_items" not in st.session_state:
     st.session_state.checked_items = set()
 if "mail_to"       not in st.session_state:
     st.session_state.mail_to       = ""
+if "aktif_profil"  not in st.session_state:
+    st.session_state.aktif_profil  = "Can & Berrin"
 
 
 # ─── SIDEBAR ──────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
     <div class="logo-wrap">
-      <div class="logo-text">🥗 Beslenme Paneli</div>
-      <div class="logo-sub">Can & Berrin · Haftalık Plan</div>
+      <div class="logo-text">🥗 Aile Beslenme Paneli</div>
+      <div class="logo-sub">Sağlıklı Yaşam Platformu</div>
     </div>
     """, unsafe_allow_html=True)
+
+    # ── Profil Seçimi ──
+    st.markdown('<div class="nav-label">Profil Seçimi</div>', unsafe_allow_html=True)
+    profil = st.radio(
+        "", ["Can & Berrin", "Gülten"],
+        index=0 if st.session_state.aktif_profil == "Can & Berrin" else 1,
+        label_visibility="collapsed", key="profil_radio"
+    )
+    if profil != st.session_state.aktif_profil:
+        st.session_state.aktif_profil = profil
+        st.rerun()
 
     # ── Sayfa Seçimi ──
     st.markdown('<div class="nav-label">Menü</div>', unsafe_allow_html=True)
@@ -389,7 +439,7 @@ with st.sidebar:
         label_visibility="collapsed", key="page_radio"
     )
 
-    # ── Gün Seçimi (Tüm günlerin seçilebilmesi eklendi) ──
+    # ── Gün Seçimi ──
     if "Beslenme" in page:
         st.markdown('<div class="nav-label">Gün Seç</div>', unsafe_allow_html=True)
         bugun = GUNLER[datetime.now().weekday()]
@@ -415,9 +465,10 @@ with st.sidebar:
         st.caption(f"📤 Gönderici: `{SMTP_USER}`")
 
 
-# ─── DATA YÜKLEMESİ ───────────────────────────────────────────────────────────
+# ─── DATA YÜKLEMESİ (PROFİLE GÖRE DİNAMİK) ────────────────────────────────────
 try:
-    df_diyet = load_diyet()
+    secili_gid = GID_DIYET_CB if st.session_state.aktif_profil == "Can & Berrin" else GID_DIYET_GULTEN
+    df_diyet = load_diyet(secili_gid)
     df_alisv = load_alisveris()
     data_ok  = True
 except Exception as e:
@@ -430,8 +481,6 @@ if not data_ok:
 # ─── SÜTUN TESPİTİ ────────────────────────────────────────────────────────────
 c_gun    = col_find(df_diyet, "Gün", "Gun")
 c_ogün   = col_find(df_diyet, "Öğün", "Ogun")
-c_can    = col_find(df_diyet, "Can")
-c_berrin = col_find(df_diyet, "Berrin")
 c_supp   = col_find(df_diyet, "Supplement", "Takviye", "Supp")
 c_not    = col_find(df_diyet, "Not")
 
@@ -449,8 +498,8 @@ with mail_col:
                 try:
                     send_email(
                         rcpts,
-                        f"🥗 {st.session_state.secili_gun} · Beslenme & Alışveriş",
-                        build_html(df_diyet, df_alisv, st.session_state.secili_gun)
+                        f"🥗 {st.session_state.secili_gun} · {st.session_state.aktif_profil} Planı",
+                        build_html(df_diyet, df_alisv, st.session_state.secili_gun, st.session_state.aktif_profil)
                     )
                     st.success(f"✅ Gönderildi → {', '.join(rcpts)}")
                 except Exception as ex:
@@ -477,13 +526,23 @@ if "Beslenme" in page:
       {'<div class="today-badge">✅ Bugün</div>' if secili == bugun else ''}
     </div>""", unsafe_allow_html=True)
 
-    st.markdown("""
-    <div class="info-bar">
-      <div class="info-pill">💧 <b>Su:</b> 3 Litre</div>
-      <div class="info-pill">🥑 <b>Yağ:</b> 1 YK = 10g</div>
-      <div class="info-pill">🌿 <b>Yeşillik:</b> Maydanoz / Roka / Tere serbest</div>
-    </div>
-    """, unsafe_allow_html=True)
+    # GÜLTEN İÇİN FARKLI, SİZİN İÇİN FARKLI BİLGİ BARI
+    if st.session_state.aktif_profil == "Can & Berrin":
+        st.markdown("""
+        <div class="info-bar">
+          <div class="info-pill">💧 <b>Su:</b> 3 Litre</div>
+          <div class="info-pill">🥑 <b>Yağ:</b> 1 YK = 10g</div>
+          <div class="info-pill">🌿 <b>Yeşillik:</b> Maydanoz / Roka / Tere serbest</div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div class="info-bar">
+          <div class="info-pill">💧 <b>Su:</b> 2.5 Litre (Ödem atıcı)</div>
+          <div class="info-pill">⏳ <b>Saat:</b> Akşam yemeği en geç 19:00</div>
+          <div class="info-pill">🚶‍♀️ <b>Hareket:</b> Günlük 40dk yürüyüş (İnsülin için)</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     if plan.empty:
         st.markdown(
@@ -497,18 +556,16 @@ if "Beslenme" in page:
         st.markdown(
             f'<div class="stats-bar">'
             f'<div class="stat-chip">🍽️ <strong>{len(plan)}</strong> öğün</div>'
-            f'<div class="stat-chip">📅 <strong>{secili}</strong></div>'
+            f'<div class="stat-chip">👤 <strong>{st.session_state.aktif_profil}</strong></div>'
             f'</div>',
             unsafe_allow_html=True
         )
-
-        col_left, col_right = st.columns(2, gap="large")
 
         def draw_person(col, person_col, ph_cls, av_cls, pn_cls, name_label, tag_cls, card_cls):
             with col:
                 st.markdown(
                     f'<div class="person-hdr {ph_cls}">'
-                    f'<div class="avatar {av_cls}">{name_label[0]}</div>'
+                    f'<div class="avatar {av_cls}">{name_label[0] if "Can" in name_label else "B" if "Berrin" in name_label else "G"}</div>'
                     f'<div class="p-name {pn_cls}">{name_label}</div>'
                     f'</div>',
                     unsafe_allow_html=True
@@ -537,15 +594,25 @@ if "Beslenme" in page:
                         unsafe_allow_html=True
                     )
 
-        draw_person(col_left,  c_can,    "ph-can",    "av-can",    "pn-can",    "🏃 Can",    "mo-can",    "mc-can")
-        draw_person(col_right, c_berrin, "ph-berrin", "av-berrin", "pn-berrin", "💃 Berrin", "mo-berrin", "mc-berrin")
+        # SEÇİLİ PROFİLE GÖRE ÇİZİM
+        if st.session_state.aktif_profil == "Can & Berrin":
+            c_can    = col_find(df_diyet, "Can")
+            c_berrin = col_find(df_diyet, "Berrin")
+            col_left, col_right = st.columns(2, gap="large")
+            draw_person(col_left,  c_can,    "ph-can",    "av-can",    "pn-can",    "🏃 Can",    "mo-can",    "mc-can")
+            draw_person(col_right, c_berrin, "ph-berrin", "av-berrin", "pn-berrin", "💃 Berrin", "mo-berrin", "mc-berrin")
+        else:
+            # GÜLTEN'İN YENİ BAŞLIĞINI BURAYA DA İŞLEDİK
+            c_gulten = col_find(df_diyet, "Gulten Beslenme Programi", "Gülten", "Gulten")
+            col_center, _ = st.columns([1.5, 1]) 
+            draw_person(col_center, c_gulten, "ph-gulten", "av-gulten", "pn-gulten", "👑 Gülten", "mo-gulten", "mc-gulten")
 
-    with st.expander("📋 Tüm Haftalık Programı Gör"):
+    with st.expander(f"📋 {st.session_state.aktif_profil} Haftalık Programını Gör"):
         st.dataframe(df_diyet, use_container_width=True, hide_index=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SAYFA 2 — ALIŞVERİŞ LİSTESİ
+# SAYFA 2 — ALIŞVERİŞ LİSTESİ (Ortak)
 # ══════════════════════════════════════════════════════════════════════════════
 elif "Alışveriş" in page:
 
