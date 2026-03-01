@@ -33,10 +33,9 @@ st.markdown("""
 .stApp { background: #f0f4f8; }
 .block-container { padding: 1.5rem 2rem 5rem !important; max-width: 1120px; }
 
-/* Menünün kaybolmasını engellemek için header'ı tamamen gizlemek yerine şeffaf yapıyoruz */
+/* ── HEADER FİX (Menü butonunun kaybolmasını engeller) ── */
 #MainMenu, footer { visibility: hidden; }
 header { background: transparent !important; }
-header [data-testid="stToolbar"] { display: none !important; }
 
 /* ── Sidebar ── */
 [data-testid="stSidebar"] {
@@ -45,44 +44,23 @@ header [data-testid="stToolbar"] { display: none !important; }
 }
 [data-testid="stSidebar"] > div { padding: 1.5rem 1rem; }
 
-/* Sidebar AÇIKKEN içindeki kapatma butonu */
-[data-testid="stSidebarCollapseButton"] {
+/* ── Menü Göster/Gizle Butonları (Yeşil Yapıyoruz) ── */
+button[kind="headerNoPadding"] {
     background-color: #059669 !important;
     border-radius: 50% !important;
-    width: 35px !important;
-    height: 35px !important;
-    border: none !important;
     box-shadow: 0 4px 12px rgba(5,150,105,0.4) !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
+    margin-top: 10px;
+    margin-left: 10px;
 }
+button[kind="headerNoPadding"] svg,
 [data-testid="stSidebarCollapseButton"] svg {
     fill: white !important;
     color: white !important;
 }
-
-/* Sidebar KAPALIYKEN ekranda beliren açma butonu (Mobil ve Masaüstü Fix) */
-[data-testid="collapsedControl"], 
-[data-testid="stSidebarCollapsedControl"] {
+[data-testid="stSidebarCollapseButton"] {
     background-color: #059669 !important;
     border-radius: 50% !important;
-    width: 45px !important;
-    height: 45px !important;
     box-shadow: 0 4px 12px rgba(5,150,105,0.4) !important;
-    position: fixed !important;
-    top: 15px !important;
-    left: 15px !important;
-    z-index: 999999 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    visibility: visible !important;
-}
-[data-testid="collapsedControl"] svg, 
-[data-testid="stSidebarCollapsedControl"] svg {
-    fill: white !important;
-    color: white !important;
 }
 
 .logo-wrap { margin-bottom: 1.6rem; }
@@ -248,7 +226,6 @@ def load_diyet():
     df  = pd.read_csv(url)
     df.columns = [str(c).strip() for c in df.columns]
     df = df.fillna("")
-    # Sadece anlamlı satırları al (Gün sütunu dolu olanlar)
     c_gun = next((c for c in df.columns if "gün" in c.lower() or "gun" in c.lower()), None)
     if c_gun:
         df = df[df[c_gun].astype(str).str.strip().str.len() > 0]
@@ -303,7 +280,6 @@ def kat_color(k):
     return "#64748b"
 
 def col_find(df, *keywords):
-    """Sütun adında keyword geçen ilk sütunu döner."""
     for kw in keywords:
         for c in df.columns:
             if kw.lower() in c.lower():
@@ -413,7 +389,7 @@ with st.sidebar:
         label_visibility="collapsed", key="page_radio"
     )
 
-    # ── Gün Seçimi (Tüm günleri seçebilme özelliği eklendi) ──
+    # ── Gün Seçimi (Tüm günlerin seçilebilmesi eklendi) ──
     if "Beslenme" in page:
         st.markdown('<div class="nav-label">Gün Seç</div>', unsafe_allow_html=True)
         bugun = GUNLER[datetime.now().weekday()]
@@ -437,8 +413,6 @@ with st.sidebar:
 
     if SMTP_USER:
         st.caption(f"📤 Gönderici: `{SMTP_USER}`")
-    else:
-        st.warning("⚠️ SMTP_USER Secrets'ta tanımlı değil.")
 
 
 # ─── DATA YÜKLEMESİ ───────────────────────────────────────────────────────────
@@ -449,7 +423,6 @@ try:
 except Exception as e:
     data_ok = False
     st.error(f"🔴 Veri yüklenemedi: {e}")
-    st.info("Google Sheet → Paylaş → 'Bağlantıya sahip herkes görüntüleyebilir' ayarını açın.")
 
 if not data_ok:
     st.stop()
@@ -492,21 +465,18 @@ if "Beslenme" in page:
     secili = st.session_state.secili_gun
     bugun  = GUNLER[datetime.now().weekday()]
 
-    # ── Filtreleme — tam eşleşme ile güvenli filtre ──
     if c_gun:
         mask = df_diyet[c_gun].astype(str).str.strip().str.lower() == secili.lower()
         plan = df_diyet[mask].reset_index(drop=True)
     else:
         plan = pd.DataFrame()
 
-    # ── Sayfa Başlığı ──
     st.markdown(f"""
     <div class="page-hdr">
       <div class="page-hdr-title">📅 <span>{secili}</span> Beslenme Planı</div>
       {'<div class="today-badge">✅ Bugün</div>' if secili == bugun else ''}
     </div>""", unsafe_allow_html=True)
 
-    # ── Sabit Bilgi Barı ──
     st.markdown("""
     <div class="info-bar">
       <div class="info-pill">💧 <b>Su:</b> 3 Litre</div>
@@ -524,7 +494,6 @@ if "Beslenme" in page:
             unsafe_allow_html=True
         )
     else:
-        # İstatistik
         st.markdown(
             f'<div class="stats-bar">'
             f'<div class="stat-chip">🍽️ <strong>{len(plan)}</strong> öğün</div>'
@@ -535,7 +504,6 @@ if "Beslenme" in page:
 
         col_left, col_right = st.columns(2, gap="large")
 
-        # ── Kişi kartı çizim fonksiyonu ──
         def draw_person(col, person_col, ph_cls, av_cls, pn_cls, name_label, tag_cls, card_cls):
             with col:
                 st.markdown(
@@ -552,7 +520,6 @@ if "Beslenme" in page:
                     not_val  = clean(row[c_not])  if c_not  and c_not  in row.index else ""
                     icon     = meal_icon(ogün_val)
 
-                    # Boş öğün satırlarını atla
                     if not meal_val or meal_val == "—":
                         if not supp_val and not not_val:
                             continue
@@ -573,7 +540,6 @@ if "Beslenme" in page:
         draw_person(col_left,  c_can,    "ph-can",    "av-can",    "pn-can",    "🏃 Can",    "mo-can",    "mc-can")
         draw_person(col_right, c_berrin, "ph-berrin", "av-berrin", "pn-berrin", "💃 Berrin", "mo-berrin", "mc-berrin")
 
-    # ── Haftalık Tablo ──
     with st.expander("📋 Tüm Haftalık Programı Gör"):
         st.dataframe(df_diyet, use_container_width=True, hide_index=True)
 
